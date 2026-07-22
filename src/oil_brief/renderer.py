@@ -47,6 +47,7 @@ def render_report(
     wti_change_pct: float | None = None,
     brent_change_pct: float | None = None,
     sc_change_pct: float | None = None,
+    energy_category: str = "crude",
 ) -> str:
     """Render all collected data into a complete Markdown crude oil briefing."""
     lines: list[str] = []
@@ -58,7 +59,7 @@ def render_report(
     news = news or []
     events = events or []
 
-    _add(lines, f"# 📊 原油日报 — {primary_label}")
+    _add(lines, f"# 📊 能源日报 — {primary_label}")
     _add(lines, f"> 报告生成时间：{report_date}")
     _add(lines, "> **免责声明：** 本报告仅供参考，不构成任何投资建议。数据来源包括 Pandadata、EIA、OPEC 及公开财经信息。")
     _add(lines, "")
@@ -90,7 +91,8 @@ def render_report(
     # ════════════════════════════════════════════════════
     # Section 5: Today's Important Events & News
     # ════════════════════════════════════════════════════
-    _render_news_analysis(lines, news, events, trend, indicators, primary_label, primary_unit, latest_primary_price, eia_data)
+    _render_news_analysis(lines, news, events, trend, indicators, primary_label, primary_unit,
+                          latest_primary_price, eia_data, energy_category)
 
     # ════════════════════════════════════════════════════
     # Section 6: Latest Research Views
@@ -180,16 +182,16 @@ def _render_current_trend(lines, primary_label, primary_unit, variety_code, ind,
     # Brief description
     if trend.get("trend") == "up":
         if trend.get("strength") == "strong":
-            _add(lines, "当前原油市场处于 **强势上涨趋势**，多头动能充沛，价格沿短期均线上行。")
+            _add(lines, f"当前{primary_label}市场处于 **强势上涨趋势**，多头动能充沛，价格沿短期均线上行。")
         else:
-            _add(lines, "当前原油市场处于 **温和上涨趋势**，多头占优但动能有所减弱。")
+            _add(lines, f"当前{primary_label}市场处于 **温和上涨趋势**，多头占优但动能有所减弱。")
     elif trend.get("trend") == "down":
         if trend.get("strength") == "strong":
-            _add(lines, "当前原油市场处于 **强势下跌趋势**，空头主导行情，短期不宜抄底。")
+            _add(lines, f"当前{primary_label}市场处于 **强势下跌趋势**，空头主导行情，短期不宜抄底。")
         else:
-            _add(lines, "当前原油市场处于 **温和下跌趋势**，空头动能逐渐释放。")
+            _add(lines, f"当前{primary_label}市场处于 **温和下跌趋势**，空头动能逐渐释放。")
     else:
-        _add(lines, "当前原油市场处于 **震荡整理阶段**，方向不明确，等待突破信号。")
+        _add(lines, f"当前{primary_label}市场处于 **震荡整理阶段**，方向不明确，等待突破信号。")
     _add(lines, "")
 
 
@@ -341,7 +343,8 @@ def _render_resistance(lines, sr_levels, variety):
 # Section 5: News Analysis
 # ---------------------------------------------------------------------------
 
-def _render_news_analysis(lines, news, events, trend, ind, label, unit, primary_price, eia_data=None):
+def _render_news_analysis(lines, news, events, trend, ind, label, unit,
+                          primary_price, eia_data=None, energy_category="crude"):
     _add(lines, "## 五、消息面分析")
     _add(lines, "")
 
@@ -368,152 +371,17 @@ def _render_news_analysis(lines, news, events, trend, ind, label, unit, primary_
             return f"📰 [{t}]({item.get('link', '#')}) — {s}" if item.get("link") else f"📰 {t} — {s}"
         return ""
 
-    # ── 1. OPEC+ 产量政策 ──
-    _add(lines, "### 1. OPEC+ 产量政策")
-    ref = _get_news_ref("OPEC+ 产量政策")
-    if ref:
-        _add(lines, f"> {ref}")
-        _add(lines, "")
-    _add(lines, "**影响：** 🟢 **利好油价**")
-    _add(lines, "")
-    _add(lines, f"当前 {label} 处于强势上涨趋势（10日涨幅 {slope:+.1f}%），OPEC+ 维持减产力度的概率较高。")
-    _add(lines, "OPEC+ 现行减产协议（合计约 586 万桶/日）持续至 2026 年底，为油价提供底部支撑。")
-    _add(lines, "")
-    _add(lines, "**关注要点：**")
-    _add(lines, "1. 沙特、俄罗斯等核心成员国减产配额执行情况，超产国（伊拉克、哈萨克斯坦）补偿减产进展")
-    _add(lines, "2. OPEC+ 联合部长级监督委员会（JMMC）会议是否建议调整产量政策")
-    _add(lines, "3. 阿联酋额外增产基线的实际执行节奏")
-    if strength == "strong":
-        _add(lines, "4. 油价处于高位区间，OPEC+ 存在逐步增产以缓解供应紧张的潜在动力")
-    _add(lines, "")
-
-    # ── 2. EIA 库存分析 ──
-    _add(lines, "### 2. 美国 EIA 原油库存")
-    ref = _get_news_ref("美国 EIA 库存")
-    if ref:
-        _add(lines, f"> {ref}")
-        _add(lines, "")
-
-    # Try to use actual EIA data if available
-    crude_stocks_data = (eia_data or {}).get("crude_stocks", []) if eia_data else []
-    if crude_stocks_data and len(crude_stocks_data) >= 2:
-        latest = crude_stocks_data[-1]
-        prev = crude_stocks_data[-2]
-        latest_val = latest.get("value")
-        prev_val = prev.get("value")
-        latest_date = str(latest.get("date", ""))[:10]
-        if latest_val is not None and prev_val is not None:
-            chg_val = float(latest_val) - float(prev_val)
-            chg_dir = "下降" if chg_val < 0 else "上升"
-            is_bullish = chg_val < 0
-            impact_icon = "🟢" if is_bullish else "🔴"
-            impact_text = "利好油价" if is_bullish else "利空油价"
-            _add(lines, f"**影响：** {impact_icon} **{impact_text}** — {chg_dir} {abs(chg_val)/100000:.2f} 亿桶")
-            _add(lines, "")
-            _add(lines, f"📊 **最新数据（截至 {latest_date}）：**")
-            _add(lines, f"  - **商业原油库存：** {float(latest_val)/100000:.2f} 亿桶（{float(latest_val)/10:.0f} 万桶）")
-            _add(lines, f"  - **较前周变化：** {impact_icon} {chg_dir} {abs(chg_val)/100000:.2f} 亿桶（{abs(chg_val)/10:.0f} 万桶）")
-            _add(lines, "")
+    # Dispatch per energy category
+    if energy_category == "natgas":
+        _render_natgas_news(lines, _get_news_ref, trend, ind, label, unit, eia_data)
+    elif energy_category == "gasoline":
+        _render_gasoline_news(lines, _get_news_ref, trend, ind, label, unit)
+    elif energy_category == "heating_oil":
+        _render_heating_oil_news(lines, _get_news_ref, trend, ind, label, unit)
     else:
-        _add(lines, "**影响：** 🟢 **利好油价**（去库）/ 🔴 **利空油价**（累库）")
-        _add(lines, "")
-    _add(lines, "**核心监测指标：**")
-    _add(lines, "  - 🔹 商业原油库存：前值与预期对比，超预期下降 → 🟢 利好；超预期上升 → 🔴 利空")
-    _add(lines, "  - 🔹 库欣库存：WTI 交割地库存，影响近月合约及价差结构")
-    _add(lines, "  - 🔹 汽油库存：夏季出行旺季（6-9月）期间，反映终端消费强弱")
-    _add(lines, "  - 🔹 炼厂开工率：正常旺季 93-95%，下降可能暗示需求走弱")
-    _add(lines, "  - 🔹 美国原油产量：目前约 1320-1340 万桶/日，关注增速变化")
-    _add(lines, "")
-    _add(lines, "当前 Brent 处于 Backwardation 结构（近月 > 远月），反映现货市场供应偏紧。")
-    if not crude_stocks_data or len(crude_stocks_data) < 2:
-        _add(lines, "")
-        _add(lines, "💡 **提示：** 配置 EIA API Key 可在 .env 中设置 `EIA_API_KEY=your_key`，获取实时库存量化数据。")
-    _add(lines, "")
+        _render_crude_news(lines, _get_news_ref, events, trend, ind, label, unit, primary_price, eia_data)
 
-    # ── 3. 地缘政治 ──
-    _add(lines, "### 3. 地缘政治风险")
-    ref = _get_news_ref("地缘政治风险")
-    if ref:
-        _add(lines, f"> {ref}")
-        _add(lines, "")
-    _add(lines, "**影响：** 🟢 **利好油价**（供应风险溢价维持高位）")
-    _add(lines, "")
-    _add(lines, "**（一）美伊局势**")
-    _add(lines, "")
-    _add(lines, "美国与伊朗关系持续紧张，伊朗核问题谈判仍处于僵局。美国对伊朗石油出口的制裁执行力度")
-    _add(lines, "显著加强，伊朗原油出口从高峰期约 150 万桶/日回落至当前水平。若制裁进一步收紧，")
-    _add(lines, "全球供应可能减少 50-100 万桶/日，对油价构成持续支撑。")
-    _add(lines, "⚠️ 关注 IAEA 核查报告、美伊间接谈判进展及以色列对伊朗核设施的潜在行动风险。")
-    _add(lines, "")
-    _add(lines, "**（二）霍尔木兹海峡**")
-    _add(lines, "")
-    _add(lines, "霍尔木兹海峡是全球最重要的原油运输咽喉要道：")
-    _add(lines, "  - 📊 **每日通行量：** 约 1700-2100 万桶原油及成品油")
-    _add(lines, "  - 📊 **全球占比：** 约 30% 的海运石油贸易量")
-    _add(lines, "  - 📊 **地理特征：** 海峡最窄处仅 33 公里，极易受地缘事件干扰")
-    _add(lines, "  - 📊 **风险情景：** 极端情况下封锁海峡可影响全球近 1/3 海运石油，油价短期或飙升 20-30%")
-    _add(lines, "")
-    _add(lines, "伊朗多次威胁封锁霍尔木兹海峡作为反击手段。当前虽未直接威胁通行安全，")
-    _add(lines, "但该风险溢价始终是油价的重要底部支撑。关注美军波斯湾部署、伊朗革命卫队动向及油轮通行数据。")
-    _add(lines, "")
-    _add(lines, "**（三）其他地缘扰动**")
-    _add(lines, "")
-    _add(lines, "  - 俄乌冲突持续，俄罗斯原油出口受西方制裁影响，乌拉尔折价反映执行强度")
-    _add(lines, "  - 利比亚国内政治动荡导致油田间歇性停产")
-    _add(lines, "  - 红海—苏伊士运河航线受胡塞武装袭击威胁，绕行好望角增加运输成本")
-    if vol_pct > 4:
-        _add(lines, "")
-        _add(lines, f"📊 **波动率指标：** ATR={fmt_price(atr, unit)}（{vol_pct:.1f}%），地缘风险溢价显著")
-    _add(lines, "")
-
-    # ── 4. 宏观经济与需求 ──
-    _add(lines, "### 4. 宏观经济与需求预期")
-    ref = _get_news_ref("宏观经济与需求")
-    if ref:
-        _add(lines, f"> {ref}")
-        _add(lines, "")
-    _add(lines, "**影响：** 🟢 **利好油价**")
-    _add(lines, "")
-    _add(lines, "全球主要经济体数据支撑原油需求前景：")
-    _add(lines, "  - 🇺🇸 **美国：** 就业市场稳健，ISM 制造业 PMI 回升至扩张区间，经济维持韧性")
-    _add(lines, "  - 🇨🇳 **中国：** 稳增长政策持续发力，原油进口维持 ~1100 万桶/日高位")
-    _add(lines, "  - 🇮🇳 **印度：** 需求增速亮眼，已成为全球第三大原油消费国")
-    _add(lines, "  - 🌍 **机构预测：** IEA/OPEC/EIA 三大机构对 2026 年全球需求增速预测约 120-150 万桶/日")
-    _add(lines, "")
-    _add(lines, "**关注因素：**")
-    _add(lines, "  - 美联储利率决策 → 美元强弱 → 以美元计价的原油反向联动")
-    _add(lines, "  - 夏季出行旺季（6-9月）→ 汽油消费高峰 → 炼厂开工率维持高位")
-    _add(lines, "  - 欧美对俄新一轮制裁 → 影响俄罗斯原油出口流向")
-    _add(lines, "")
-
-    # ── 5. SC 内外盘价差 ──
-    _add(lines, "### 5. 人民币汇率与 SC 内外盘套利")
-    ref = _get_news_ref("SC 内外盘套利")
-    if ref:
-        _add(lines, f"> {ref}")
-        _add(lines, "")
-    _add(lines, "**影响：** 🟡 **中性**")
-    _add(lines, "")
-    _add(lines, "人民币汇率波动直接影响 SC 原油相对 WTI/Brent 的价差水平：")
-    _add(lines, "  - 人民币贬值 → SC 相对走强 → SC-Brent 价差扩大 → 进口成本上升")
-    _add(lines, "  - 人民币升值 → SC 相对走弱 → SC-Brent 价差收窄 → 进口套利窗口打开")
-    _add(lines, "")
-    if primary_price and close:
-        sc_price_latest = 531.0  # SC latest from Pandadata
-        rate = 7.30
-        implied = sc_price_latest / rate
-        diff_val2 = abs(close - implied)
-        _add(lines, f"**当前价差测算：**")
-        _add(lines, f"  - SC 主力合约：{sc_price_latest:.0f} 元/桶（SC2609）")
-        _add(lines, f"  - Brent 现货：{close:.2f} 美元/桶")
-        _add(lines, f"  - 按在岸汇率 {rate} 折算：SC 隐含 Brent ≈ {implied:.1f} 美元/桶")
-        _add(lines, f"  - 隐含价差：{abs(close - implied):.1f} 美元/桶（约 {abs(close - implied) * rate:.0f} 元/桶）")
-        if abs(close - implied) > 10:
-            _add(lines, "")
-            _add(lines, "SC 较外盘溢价偏高，关注仓单注册变化及进口套利窗口是否打开。")
-    _add(lines, "")
-
-    # ── 未来事件日历 ──
+    # ── 未来事件日历（通用）──
     if events:
         _add(lines, "### 📅 本周重要事件日历")
         _add(lines, "")
@@ -522,6 +390,169 @@ def _render_news_analysis(lines, news, events, trend, ind, label, unit, primary_
         for evt in events:
             _add(lines, f"| {evt.get('date', '—')} | {evt.get('event', '—')} | {evt.get('expected_impact', '—')} |")
         _add(lines, "")
+
+
+# ═══════════════════════════════════════════════════════════════
+# Energy-category news functions
+# ═══════════════════════════════════════════════════════════════
+
+def _render_crude_news(lines, get_ref, events, trend, ind, label, unit, primary_price, eia_data):
+    """Crude: OPEC + EIA stocks + geopolitics + macro + SC spread."""
+    _adds = lambda t="": _add(lines, t)
+    trend_dir = trend.get("trend", "neutral")
+    strength = trend.get("strength", "unknown")
+    close = primary_price or ind.get("close", 0)
+    atr = ind.get("atr", 0)
+    vol_pct = atr / close * 100 if close and atr else 0
+    slope = trend.get("slope_pct", 0)
+
+    # ── 1. OPEC+ ──
+    _add(lines, "### 1. OPEC+ 产量政策"); ref = get_ref("OPEC+ 产量政策")
+    if ref: _add(lines, f"> {ref}"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好油价**"); _add(lines, "")
+    _add(lines, f"当前 {label} 处于强势上涨趋势（10日涨幅 {slope:+.1f}%），OPEC+ 维持减产力度的概率较高。")
+    _add(lines, "OPEC+ 现行减产协议（合计约 586 万桶/日）持续至 2026 年底，为油价提供底部支撑。"); _add(lines, "")
+    _add(lines, "**关注要点：**")
+    _add(lines, "1. 沙特、俄罗斯等核心成员国减产配额执行情况，超产国补偿减产进展")
+    _add(lines, "2. JMMC 会议是否建议调整产量政策")
+    _add(lines, "3. 阿联酋额外增产基线的实际执行节奏")
+    if strength == "strong": _add(lines, "4. 油价处于高位区间，OPEC+ 存在逐步增产的潜在动力")
+    _add(lines, "")
+
+    # ── 2. EIA 库存 ──
+    _add(lines, "### 2. 美国 EIA 原油库存"); ref = get_ref("美国 EIA 库存")
+    if ref: _add(lines, f"> {ref}"); _add(lines, "")
+    cs = (eia_data or {}).get("crude_stocks", []) if eia_data else []
+    if cs and len(cs) >= 2 and cs[-1].get("value") and cs[-2].get("value"):
+        cv = float(cs[-1]["value"]) - float(cs[-2]["value"]); d = "下降" if cv < 0 else "上升"
+        ic = "🟢" if cv < 0 else "🔴"; it = "利好油价" if cv < 0 else "利空油价"
+        _add(lines, f"**影响：** {ic} **{it}** — {d} {abs(cv)/100000:.2f} 亿桶"); _add(lines, "")
+        _add(lines, f"📊 **最新数据（截至 {str(cs[-1].get('date',''))[:10]}）：**")
+        _add(lines, f"  - **商业原油库存：** {float(cs[-1]['value'])/100000:.2f} 亿桶（{float(cs[-1]['value'])/10:.0f} 万桶）")
+        _add(lines, f"  - **较前周变化：** {ic} {d} {abs(cv)/100000:.2f} 亿桶（{abs(cv)/10:.0f} 万桶）"); _add(lines, "")
+    else:
+        _add(lines, "**影响：** 🟢 去库利好 / 🔴 累库利空"); _add(lines, "")
+    _add(lines, "**核心监测指标：** 🔹商业库存 🔹库欣库存 🔹汽油库存 🔹炼厂开工率 🔹美国产量")
+    _add(lines, "当前 Brent 处于 Backwardation 结构（近月 > 远月），反映现货市场供应偏紧。"); _add(lines, "")
+
+    # ── 3. 地缘政治 ──
+    _add(lines, "### 3. 地缘政治风险"); ref = get_ref("地缘政治风险")
+    if ref: _add(lines, f"> {ref}"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好油价**（供应风险溢价维持高位）"); _add(lines, "")
+    _add(lines, "**（一）美伊局势**"); _add(lines, "")
+    _add(lines, "美国对伊朗制裁持续，出口从高峰 ~150 万桶/日回落。若进一步收紧，全球供应或减少 50-100 万桶/日。")
+    _add(lines, "⚠️ 关注 IAEA 核查报告及以色列对伊朗核设施的潜在行动风险。"); _add(lines, "")
+    _add(lines, "**（二）霍尔木兹海峡**"); _add(lines, "")
+    _add(lines, "  - 📊 日通行量 1700-2100 万桶，占全球海运石油 30%，最窄处仅 33 公里")
+    _add(lines, "  - 📊 极端情景：封锁海峡可影响全球近 1/3 海运石油，油价短期或飙升 20-30%")
+    _add(lines, "伊朗多次威胁封锁海峡，该风险溢价始终是油价的重要底部支撑。"); _add(lines, "")
+    _add(lines, "**（三）其他地缘扰动**：俄乌冲突、利比亚停产、红海胡塞武装")
+    if vol_pct > 4:
+        _add(lines, ""); _add(lines, f"📊 **波动率指标：** ATR={fmt_price(atr, unit)}（{vol_pct:.1f}%），地缘风险溢价显著")
+    _add(lines, "")
+
+    # ── 4. 宏观经济 ──
+    _add(lines, "### 4. 宏观经济与需求预期")
+    _add(lines, "**影响：** 🟢 **利好油价**"); _add(lines, "")
+    _add(lines, "全球主要经济体数据支撑原油需求前景：")
+    _add(lines, "  - 🇺🇸 **美国：** 就业市场稳健，ISM 制造业 PMI 回升至扩张区间")
+    _add(lines, "  - 🇨🇳 **中国：** 稳增长政策持续发力，原油进口维持 ~1100 万桶/日高位")
+    _add(lines, "  - 🇮🇳 **印度：** 需求增速亮眼，已成为全球第三大原油消费国")
+    _add(lines, "  - 🌍 IEA/OPEC/EIA 三大机构对 2026 年需求增速预测约 120-150 万桶/日")
+    _add(lines, "")
+
+    # ── 5. SC 价差 ──
+    _add(lines, "### 5. SC 内外盘价差")
+    _add(lines, "**影响：** 🟡 **中性**"); _add(lines, "")
+    _add(lines, "人民币贬值 → SC 相对走强 → SC-Brent 价差扩大 → 进口成本上升。")
+    _add(lines, "人民币升值 → SC 相对走弱 → 价差收窄 → 进口套利窗口打开。"); _add(lines, "")
+    if primary_price and close:
+        implied = 531.0 / 7.30
+        diff_v = abs(close - implied)
+        _add(lines, f"SC({531:.0f}元/桶) / 汇率7.30 → 隐含 Brent {implied:.1f} 美元/桶")
+        _add(lines, f"实际 Brent {close:.2f} 美元/桶，价差 {diff_v:.1f} 美元/桶（约 {diff_v*7.30:.0f} 元/桶）")
+        if diff_v > 10: _add(lines, "SC 溢价偏高，关注进口套利窗口变化。")
+    _add(lines, "")
+
+
+def _render_natgas_news(lines, get_ref, trend, ind, label, unit, eia_data):
+    """Natural gas: EIA storage + weather + LNG + production."""
+    atr = ind.get("atr", 0); close = ind.get("close", 0)
+    vol_pct = atr / close * 100 if close and atr else 0
+    slope = trend.get("slope_pct", 0)
+    _add(lines, "### 1. EIA 天然气库存周报"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（去库）/ 🔴 **利空**（累库）"); _add(lines, "")
+    _add(lines, "EIA 天然气库存报告每周四 22:30（北京时间）发布，是短期价格核心驱动。")
+    _add(lines, "报告覆盖：地下储气库库存变化、总储量与五年均值对比。")
+    if atr and close:
+        _add(lines, f"当前波动率 ATR={fmt_price(atr, unit)}（{vol_pct:.1f}%），天然气市场波动性较高。")
+    _add(lines, "")
+    _add(lines, "### 2. 天气与季节性需求"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（极端天气）/ 🟡 **中性**（正常天气）"); _add(lines, "")
+    _add(lines, "天然气价格对天气高度敏感：")
+    _add(lines, "  - 🔹 夏季：空调用电需求推高气电需求")
+    _add(lines, "  - 🔹 冬季：取暖用气高峰，寒潮天气是最大上行风险")
+    _add(lines, "  - 🔹 过渡季：库存注入期，价格通常承压")
+    _add(lines, "关注 NOAA 短期天气展望及取暖度日（HDD）/ 降温度日（CDD）数据。")
+    _add(lines, "")
+    _add(lines, "### 3. 供应与出口"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（出口增/产量降）/ 🔴 **利空**（产量增）"); _add(lines, "")
+    _add(lines, "  - 🔹 美国干天然气产量：目前约 1030-1050 亿立方英尺/日")
+    _add(lines, "  - 🔹 LNG 出口终端利用率影响出口量")
+    _add(lines, "  - 🔹 伴生气（associated gas）受原油产量影响")
+    _add(lines, "  - 🔹 库存水平 vs 五年均值：偏离幅度决定价格方向")
+    _add(lines, "关注 EIA 月度短期能源展望（STEO）中的天然气供需预测。")
+    _add(lines, "")
+
+
+def _render_gasoline_news(lines, get_ref, trend, ind, label, unit):
+    """Gasoline: driving season + refinery + crack + blending."""
+    _add(lines, "### 1. 季节性消费周期"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（旺季）/ 🔴 **利空**（淡季）"); _add(lines, "")
+    _add(lines, "RBOB 汽油价格受季节性出行需求影响显著：")
+    _add(lines, "  - 🔹 **夏季旺季（5-9月）：** Memorial Day → Labor Day 驾车出行高峰")
+    _add(lines, "  - 🔹 **冬季淡季：** 需求下降，价格通常承压")
+    _add(lines, "  - 🔹 **春秋换季：** 汽油规格切换（RVP 标准变更）影响供应")
+    _add(lines, "")
+    _add(lines, "### 2. 炼厂与供应"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（检修/意外停产）/ 🔴 **利空**（高开工率）"); _add(lines, "")
+    _add(lines, "  - 🔹 炼厂开工率：旺季 93-95%，检修期 85-90%")
+    _add(lines, "  - 🔹 飓风/火灾等可导致区域性供应短缺")
+    _add(lines, "  - 🔹 汽油库存：EIA 每周数据，低于五年均值 → 价格支撑")
+    _add(lines, "  - 🔹 裂解价差（crack spread）：汽油 vs 原油价差，反映炼油利润")
+    _add(lines, "")
+    _add(lines, "### 3. 混合组分与规格切换"); _add(lines, "")
+    _add(lines, "**影响：** 🟡 **中性**"); _add(lines, "")
+    _add(lines, "冬季→夏季汽油规格切换期（3-5 月），低 RVP 汽油供应受限。")
+    _add(lines, "乙醇混合义务（RFS）及 RIN 价格也影响汽油成本。")
+    _add(lines, "关注 PADD 1（东海岸）和 PADD 3（墨西哥湾）的区域库存差异。")
+    _add(lines, "")
+
+
+def _render_heating_oil_news(lines, get_ref, trend, ind, label, unit):
+    """Heating oil: heating season + refinery + diesel spread."""
+    _add(lines, "### 1. 季节性取暖需求"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 **利好**（寒冬）/ 🔴 **利空**（暖冬）"); _add(lines, "")
+    _add(lines, "取暖油需求高度依赖冬季气温：")
+    _add(lines, "  - 🔹 美国东北部（PADD 1）是取暖油主要消费区域")
+    _add(lines, "  - 🔹 寒潮 → 取暖油需求飙升 → 库存快速消耗 → 价格上行")
+    _add(lines, "  - 🔹 暖冬 → 取暖需求低于正常 → 库存累积 → 价格承压")
+    _add(lines, "关注 NOAA 冬季气温展望及取暖度日（HDD）数据。")
+    _add(lines, "")
+    _add(lines, "### 2. 柴油市场联动"); _add(lines, "")
+    _add(lines, "**影响：** 🟡 **中性**"); _add(lines, "")
+    _add(lines, "取暖油与柴油（ULSD）化学性质相近，价格高度相关：")
+    _add(lines, "  - 🔹 柴油需求：货运/农业/工业用油，与经济周期密切相关")
+    _add(lines, "  - 🔹 ULSD 与取暖油价差通常较窄")
+    _add(lines, "  - 🔹 炼厂柴油收率优化影响取暖油供应")
+    _add(lines, "")
+    _add(lines, "### 3. 库存与炼厂"); _add(lines, "")
+    _add(lines, "**影响：** 🟢 去库利好 / 🔴 累库利空"); _add(lines, "")
+    _add(lines, "  - 🔹 馏分油库存（含取暖油和柴油）：EIA 每周四发布")
+    _add(lines, "  - 🔹 库存低于五年均值 → 价格支撑；高于均值 → 承压")
+    _add(lines, "  - 🔹 炼厂秋季检修前后，馏分油产量变化影响库存")
+    _add(lines, "关注 EIA 馏分油库存数据及 ULSD-取暖油价差。")
+    _add(lines, "")
 
 
 # ---------------------------------------------------------------------------

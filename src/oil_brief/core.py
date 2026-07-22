@@ -23,20 +23,45 @@ logger = logging.getLogger(__name__)
 
 
 VARIETY_CONFIG = {
+    # Crude oil
     "BRENT": {
         "label": "Brent 原油",
         "unit": "美元/桶",
         "yahoo_ticker": "BZ=F",
+        "category": "crude",
     },
     "WTI": {
         "label": "WTI 原油",
         "unit": "美元/桶",
         "yahoo_ticker": "CL=F",
+        "category": "crude",
     },
     "SC": {
         "label": "上海原油期货",
         "unit": "元/桶",
         "yahoo_ticker": None,
+        "category": "crude",
+    },
+    # Natural gas
+    "NG": {
+        "label": "天然气",
+        "unit": "美元/百万英热",
+        "yahoo_ticker": "NG=F",
+        "category": "natgas",
+    },
+    # RBOB Gasoline
+    "RB": {
+        "label": "RBOB 汽油",
+        "unit": "美元/加仑",
+        "yahoo_ticker": "RB=F",
+        "category": "gasoline",
+    },
+    # Heating Oil
+    "HO": {
+        "label": "取暖油",
+        "unit": "美元/加仑",
+        "yahoo_ticker": "HO=F",
+        "category": "heating_oil",
     },
 }
 
@@ -96,6 +121,7 @@ def generate_report(
 
     cfg = VARIETY_CONFIG.get(variety, VARIETY_CONFIG["BRENT"])
     logger.info("Primary analysis target: %s", cfg["label"])
+    eia_client = EIAClient()
 
     # ── Parallel data fetching ──
     sc_data: dict[str, Any] = {}
@@ -124,17 +150,19 @@ def generate_report(
 
     # ── Pick daily OHLCV for technical analysis based on variety ──
     daily_df = None
+    yahoo_ticker = cfg.get("yahoo_ticker")
 
     if variety == "SC":
         daily_df = sc_data.get("daily", None)
-    elif variety == "BRENT":
-        daily_df = eia_data.get("brent_daily", None)
-        if daily_df is not None and not daily_df.empty:
-            logger.info("Using Brent daily data for TA: %d rows", len(daily_df))
-    elif variety == "WTI":
-        daily_df = eia_data.get("wti_daily", None)
-        if daily_df is not None and not daily_df.empty:
-            logger.info("Using WTI daily data for TA: %d rows", len(daily_df))
+    elif yahoo_ticker:
+        # Fetch daily OHLCV from Yahoo for any commodity ticker
+        try:
+            daily_df = eia_client.get_energy_daily(yahoo_ticker, days=days)
+            if daily_df is not None and not daily_df.empty:
+                logger.info("Using %s (%s) daily data for TA: %d rows",
+                            cfg["label"], yahoo_ticker, len(daily_df))
+        except Exception as e:
+            logger.warning("Failed to fetch %s daily data: %s", yahoo_ticker, e)
 
     # ── Technical analysis ──
     indicator_df = None
@@ -232,6 +260,7 @@ def generate_report(
         wti_change_pct=wti_change_pct,
         brent_change_pct=brent_change_pct,
         sc_change_pct=sc_change_pct,
+        energy_category=cfg.get("category", "crude"),
     )
 
     # ── Save if output path provided ──

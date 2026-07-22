@@ -18,7 +18,7 @@ def main():
         "--variety", "-v",
         type=str,
         default="BRENT",
-        help="分析品种：BRENT（默认）、WTI、SC",
+        help="分析品种：BRENT（默认）、WTI、SC、NG（天然气）、RB（汽油）、HO（取暖油）",
     )
     parser.add_argument(
         "--days", "-d",

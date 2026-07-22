@@ -141,35 +141,34 @@ def get_brent_yahoo(days: int = 60) -> pd.DataFrame:
 
 
 def get_brent_daily(days: int = 120) -> pd.DataFrame:
-    """Fetch Brent daily OHLCV data for technical analysis.
-
-    Returns DataFrame with columns: trade_date, open, high, low, close, volume.
-    """
-    df = _fetch_yahoo_ohlcv("BZ=F", days=days)
-    if df.empty:
-        return df
-    df = df.rename(columns={
-        "date": "trade_date",
-        "value": "close",
-    })
-    # Ensure numeric
-    for col in ["open", "high", "low", "close", "volume"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    return df
+    """Fetch Brent daily OHLCV data for technical analysis."""
+    return _fetch_yahoo_ohlcv_to_daily("BZ=F", days=days)
 
 
 def get_wti_daily(days: int = 120) -> pd.DataFrame:
-    """Fetch WTI daily OHLCV data for technical analysis.
+    """Fetch WTI daily OHLCV data for technical analysis."""
+    return _fetch_yahoo_ohlcv_to_daily("CL=F", days=days)
 
-    Returns DataFrame with columns: trade_date, open, high, low, close, volume.
+
+def get_energy_daily(ticker: str, days: int = 120) -> pd.DataFrame:
+    """Fetch daily OHLCV for any energy commodity ticker.
+
+    Args:
+        ticker: Yahoo Finance ticker (e.g. 'NG=F', 'RB=F', 'HO=F').
+        days: Number of days of history.
+
+    Returns:
+        DataFrame with columns: trade_date, open, high, low, close, volume.
     """
-    df = _fetch_yahoo_ohlcv("CL=F", days=days)
+    return _fetch_yahoo_ohlcv_to_daily(ticker, days=days)
+
+
+def _fetch_yahoo_ohlcv_to_daily(ticker: str, days: int = 120) -> pd.DataFrame:
+    """Fetch Yahoo OHLCV and rename to standard daily format."""
+    df = _fetch_yahoo_ohlcv(ticker, days=days)
     if df.empty:
         return df
-    df = df.rename(columns={
-        "date": "trade_date",
-        "value": "close",
-    })
+    df = df.rename(columns={"date": "trade_date", "value": "close"})
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
@@ -210,6 +209,10 @@ class EIAClient:
     def get_wti_daily(self, days: int = 120) -> pd.DataFrame:
         """Fetch WTI daily OHLCV for technical analysis."""
         return get_wti_daily(days=days)
+
+    def get_energy_daily(self, ticker: str, days: int = 120) -> pd.DataFrame:
+        """Fetch daily OHLCV for any energy commodity ticker."""
+        return get_energy_daily(ticker, days=days)
 
     # ── EIA API based data (requires API key) ──
 
