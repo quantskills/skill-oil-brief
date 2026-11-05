@@ -154,3 +154,6 @@ GPL-3.0
 ## Author
 
 - **xixihaha-dzh** — 作者与维护者
+
+
+Pandadata 兼容维护：[abgyjaguo](https://github.com/abgyjaguo)，保留原项目作者署名。
