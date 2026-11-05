@@ -115,3 +115,7 @@ python -m oil_brief --verbose
 - SC 合约有涨跌停板限制（±8% 或 ±13%）
 - 数据频率：日频数据，适合日报/周报场景
 - 本报告仅供参考，不构成投资建议
+
+## Pandadata compatibility
+
+[Pandadata 1.0.6 compatibility](references/pandadata-compatibility.md) — exact SDK baseline, validation scope, and shared guidance for all supported agent runtimes.
